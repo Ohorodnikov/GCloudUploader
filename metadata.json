@@ -1,0 +1,5 @@
+{
+  "name": "GCloud Bucket Uploader",
+  "description": "A modern, responsive file uploader for Google Cloud Storage buckets with Gemini-powered image analysis capabilities.",
+  "requestFramePermissions": []
+}
