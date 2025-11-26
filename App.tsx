@@ -1,12 +1,12 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { UploadedFile } from './types';
 import UploadZone from './components/UploadZone';
 import FileItem from './components/FileItem';
 import SettingsModal from './components/SettingsModal';
 import { uploadFileToBackend } from './services/uploadService';
 import { analyzeImage } from './services/geminiService';
-import { UploadCloudIcon, SettingsIcon, CheckCircleIcon, KeyIcon } from './components/Icons';
+import { UploadCloudIcon, SettingsIcon, CheckCircleIcon } from './components/Icons';
 import { DEFAULT_BUCKET_NAME, ENV_CONFIG } from './constants';
 
 function App() {
@@ -17,18 +17,24 @@ function App() {
   const [bucketName, setBucketName] = useState(ENV_CONFIG.BUCKET_NAME || DEFAULT_BUCKET_NAME);
   
   // Smart default for Backend URL:
-  // 1. Env var takes precedence
-  // 2. Split Dev Mode: If we are on localhost but NOT port 3001 (the server port), assume split dev environment (Frontend on 3000, Backend on 3001)
-  // 3. Integrated Mode (Production or Localhost:3001): Use relative path ("") to avoid CORS and hardcoded domains.
   const getInitialBackendUrl = () => {
     if (ENV_CONFIG.BACKEND_URL) return ENV_CONFIG.BACKEND_URL;
     
-    // Check if we are likely in a split development environment (e.g. Vite on 5173, Server on 3001)
-    if (window.location.hostname === 'localhost' && window.location.port !== '3001') {
+    const hostname = window.location.hostname;
+
+    // 1. GitHub Pages or other Static Hosts detection
+    // If we are on github.io, we are definitely NOT on the same host as the Node backend.
+    if (hostname.includes('github.io') || hostname.includes('vercel.app') || hostname.includes('netlify.app')) {
+      return ''; // User needs to configure this manually
+    }
+    
+    // 2. Split Dev Mode (e.g. Vite on 5173, Server on 3001)
+    if (hostname === 'localhost' && window.location.port !== '3001') {
       return 'http://localhost:3001';
     }
     
-    // Default to relative path for "One App" deployment
+    // 3. Integrated Mode (Production or Localhost:3001)
+    // Use relative path ("") to avoid CORS and hardcoded domains.
     return '';
   };
 
@@ -36,6 +42,13 @@ function App() {
   
   // Computed Auth State
   const isEnvBucket = !!ENV_CONFIG.BUCKET_NAME;
+
+  // Show settings on load if on GitHub Pages and no backend URL is set
+  useEffect(() => {
+    if (window.location.hostname.includes('github.io') && !backendUrl) {
+      setShowSettings(true);
+    }
+  }, [backendUrl]);
 
   const handleFilesSelected = useCallback((newFiles: File[]) => {
     const newUploads: UploadedFile[] = newFiles.map((file) => ({
@@ -56,6 +69,16 @@ function App() {
 
   const startUpload = async (upload: UploadedFile) => {
     updateFileStatus(upload.id, { status: 'uploading' });
+
+    // Sanity check for static hosts
+    if (window.location.hostname.includes('github.io') && !backendUrl) {
+       updateFileStatus(upload.id, {
+        status: 'error',
+        error: 'Backend URL missing. Please configure Settings.',
+      });
+      setShowSettings(true);
+      return;
+    }
 
     try {
       const publicUrl = await uploadFileToBackend(
@@ -129,7 +152,7 @@ function App() {
         )}
         <button 
           onClick={() => setShowSettings(true)}
-          className="p-2 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all duration-300"
+          className={`p-2 rounded-full transition-all duration-300 ${(!backendUrl && window.location.hostname.includes('github.io')) ? 'bg-indigo-600 text-white animate-pulse' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
           title="Configuration"
         >
           <SettingsIcon className="w-6 h-6" />

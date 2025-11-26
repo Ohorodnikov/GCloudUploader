@@ -10,7 +10,7 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Enable CORS (useful for dev split mode, harmless in prod)
+// Enable CORS (useful for dev split mode and cross-domain github pages requests)
 app.use(cors());
 
 // Configure Multer to store files in memory
